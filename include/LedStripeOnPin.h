@@ -1,29 +1,27 @@
-#include <list>
-#include <ArduinoJson.h>
+#ifndef LEDSTRIPEONPIN_H
+#define LEDSTRIPEONPIN_H
+
+#pragma once
+
+#include <array>
+#include <string>
+#include <unordered_map>
+#include "ArduinoJson.h"
+
+enum class Color {
+    Green,
+    Red,
+    Blue
+};
 
 class LedStripeOnPin {
-    boolean _colorMode = true;
-    short _pin = 0;
-    int _ledCount = 0;
-    boolean _stateOn = false;
-
-    u32_t _brightness = 0;
-    u32_t _red = 0;
-    u32_t _green = 0;
-    u32_t _blue = 0;
-    u32_t _white = 0;
-
-    String _animation;
-
-    char _buffer[512] = { };
-
 public:
     // ------------------------------------- getter and setter -------------------------------------
-    boolean getColorMode() const {
+    bool getColorMode() const {
         return _colorMode;
     }
 
-    void setColorMode(boolean colorMode) {
+    void setColorMode(bool colorMode) {
         _colorMode = colorMode;
     }
 
@@ -43,59 +41,59 @@ public:
         _ledCount = ledCount;
     }
 
-    boolean getStateOn() const {
+    bool getStateOn() const {
         return _stateOn;
     }
 
-    void setStateOn(boolean stateOn) {
+    void setStateOn(bool stateOn) {
         _stateOn = stateOn;
     }
 
-    u32_t getBrightness() const {
+    uint32_t getBrightness() const {
         return _brightness;
     }
 
-    void setBrightness(u32_t brightness) {
+    void setBrightness(uint32_t brightness) {
         _brightness = brightness;
     }
 
-    u32_t getRed() const {
+    uint32_t getRed() const {
         return _red;
     }
 
-    void setRed(u32_t red) {
+    void setRed(uint32_t red) {
         _red = red;
     }
 
-    u32_t getGreen() const {
+    uint32_t getGreen() const {
         return _green;
     }
 
-    void setGreen(u32_t green) {
+    void setGreen(uint32_t green) {
         _green = green;
     }
 
-    u32_t getBlue() const {
+    uint32_t getBlue() const {
         return _blue;
     }
 
-    void setBlue(u32_t blue) {
+    void setBlue(uint32_t blue) {
         _blue = blue;
     }
 
-    u32_t getWhite() const {
+    uint32_t getWhite() const {
         return _white;
     }
 
-    void setWhite(u32_t white) {
+    void setWhite(uint32_t white) {
         _white = white;
     }
 
-    const String &getAnimation() const {
+    const std::string &getAnimation() const {
         return _animation;
     }
 
-    void setAnimation(const String &animation) {
+    void setAnimation(const std::string &animation) {
         _animation = animation;
     }
 
@@ -105,6 +103,10 @@ public:
 
     void setBuffer(char buffer[512]) {
         strcpy(_buffer, buffer);
+    }
+
+    void writeBuffer() {
+        serializeJson(getInfo(), _buffer);
     }
 
     LedStripeOnPin() = default;
@@ -142,43 +144,29 @@ public:
     }
 
     // ------------------------------------- calc brightness -------------------------------------
-    u32_t applyBrightnessToLight(int color) const {
-        u32_t lightValue = 0;
-        switch (color) {
-            case 0:
-                lightValue = this->getGreen();
-                break;
-            case 1:
-                lightValue = this->getRed();
-                break;
-            case 2:
-                lightValue = this->getBlue();
-                break;
-            default:
-                break;
-        }
+    uint32_t applyBrightnessToLight(Color color) const {
+        static const std::unordered_map<Color, std::function<uint32_t(void)>> colorToFunction = {
+                {Color::Green, [this] { return this->getGreen(); }},
+                {Color::Red, [this] { return this->getRed(); }},
+                {Color::Blue, [this] { return this->getBlue(); }}
+        };
+
+        uint32_t lightValue = colorToFunction.at(color)();
+
         if (this->getStateOn()) {
-            // FIXME fix these nearly illegal casts
-            auto value = static_cast<u32_t>((static_cast<double>(lightValue) / 255) * this->getBrightness());
-            if (value > 255) {
-                return 255;
-            }
-            else {
-                return value;
-            }
+            auto value = (lightValue / 255) * this->getBrightness();
+            return std::min(value, 255u);
         }
-        else {
-            return 0;
-        }
+
+        return 0;
     }
 
     // ------------------------------------- put current values into jsonObject -------------------------------------
-    StaticJsonDocument<512> getInfo() const {
-        StaticJsonDocument<512> jsonDocument;
+    JsonDocument getInfo() const {
+        JsonDocument jsonDocument;
         jsonDocument.clear();
-        JsonObject jsonObject = jsonDocument.createNestedObject();
+        JsonObject jsonObject = jsonDocument.add<JsonObject>();
         jsonObject["colorMode"] = this->getColorMode();
-        jsonObject["pin"] = this->getPin();
         jsonObject["ledCount"] = this->getLedCount();
         jsonObject["stateOn"] = this->getStateOn();
         jsonObject["brightness"] = this->getBrightness();
@@ -193,4 +181,22 @@ public:
         }
         return jsonDocument;
     }
+
+private:
+    bool _colorMode = true;
+    short _pin = 0;
+    int _ledCount = 0;
+    bool _stateOn = false;
+
+    uint32_t _brightness = 0;
+    uint32_t _red = 0;
+    uint32_t _green = 0;
+    uint32_t _blue = 0;
+    uint32_t _white = 0;
+
+    std::string _animation;
+
+    char _buffer[512] = { };
 };
+
+#endif //LEDSTRIPEONPIN_H
